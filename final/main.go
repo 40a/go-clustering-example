@@ -18,8 +18,9 @@ import (
 var (
 	counter = &crdt.GCounter{}
 
-	members = flag.String("members", "", "comma seperated list of members")
-	port    = flag.Int("port", 4001, "http port")
+	members  = flag.String("members", "", "comma seperated list of members")
+	port     = flag.Int("port", 4001, "http port")
+	rpc_port = flag.Int("rpc_port", 0, "memberlist port (0 = auto select)")
 
 	broadcasts *memberlist.TransmitLimitedQueue
 
@@ -63,8 +64,6 @@ func (d *delegate) NotifyMsg(b []byte) {
 		return
 	}
 
-	fmt.Printf("Received A Message!\n\t%+v\n", string(b))
-
 	var update *update
 	if err := json.Unmarshal(b, &update); err != nil {
 		return
@@ -84,7 +83,7 @@ func (d *delegate) GetBroadcasts(overhead, limit int) [][]byte {
 	return broadcasts.GetBroadcasts(overhead, limit)
 }
 
-//share the local counter state
+// Share the local counter state via MemberList to another node
 func (d *delegate) LocalState(join bool) []byte {
 
 	b, err := counter.MarshalJSON()
@@ -97,21 +96,15 @@ func (d *delegate) LocalState(join bool) []byte {
 }
 
 // Merge in received counter state whenever
-// join = false means this was received after a push/pull sync: basically a full state refresh.
+// join = false means this was received after a push/pull sync
+// basically a full state refresh.
 func (d *delegate) MergeRemoteState(buf []byte, join bool) {
 	if len(buf) == 0 {
 		return
 	}
 
-	// if !join {
-	// 	return
-	// }
-
-	fmt.Println("Syncing via MergeRemoteState")
-
 	externalCRDT := crdt.NewGCounterFromJSONBytes(buf)
 	counter.Merge(externalCRDT)
-
 }
 
 // BroadcastState broadcasts the local counter state to all cluster members
@@ -147,10 +140,11 @@ func start() error {
 	hostname, _ := os.Hostname()
 	c := memberlist.DefaultWANConfig()
 	c.Delegate = &delegate{}
-	c.BindPort = 0
+	c.BindPort = *rpc_port
 	c.Name = hostname + "-" + uuid.NewV4().String()
 
 	c.PushPullInterval = time.Second * 5 // to make it demonstrable
+	c.ProbeInterval = time.Second * 1    // to make failure demonstrable
 
 	var err error
 
@@ -158,6 +152,7 @@ func start() error {
 	if err != nil {
 		return err
 	}
+
 	if len(*members) > 0 {
 		parts := strings.Split(*members, ",")
 		_, err := m.Join(parts)
@@ -165,14 +160,17 @@ func start() error {
 			return err
 		}
 	}
+
 	broadcasts = &memberlist.TransmitLimitedQueue{
 		NumNodes: func() int {
 			return m.NumMembers()
 		},
 		RetransmitMult: 3,
 	}
+
 	node := m.LocalNode()
 	fmt.Printf("Local member %s:%d\n", node.Addr, node.Port)
+
 	return nil
 }
 

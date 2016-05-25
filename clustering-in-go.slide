@@ -7,9 +7,9 @@ MediaMath
 @nphase
 
 * Who am I?
-- Golang enthusiast
+- Go enthusiast
 - These days, mostly codes for fun
-- Oversee Infrastruture & Platform @ [[http://careers.mediamath.com][MediaMath]]
+- Focused on Infrastruture & Platform @ [[http://careers.mediamath.com][MediaMath]]
 - We're hiring!
 
 * Why Go?
@@ -18,158 +18,299 @@ MediaMath
 - Great stdlib
 - Lot's of community libraries & utilities
 - Great built-in tooling (like go fmt, test, vet, -race, etc) 
+- Compiles as fast as a scripting language
 - Just "feels" productive
+- (This is not a language pitch talk)
 
 * Why "Clustering in Go"?
 
 * Why "Clustering in Go"?
 
 - Clustering is not batteries included in Golang
-- Many newer libraries, none very mature
+- Lots of newer libraries, none very mature
 - More often not, services roll it themselves
 
+- So, here's one way of building a clustered, stateful service in Go.
 *This*slide*is*incomplete*
 
 
 * And now, for a (fake-ish) scenario
 
-- Multiple (3) Datacenters,
-- Separated by thousands of miles each (ORD, HKG, AMS),
-- With lots of events happening at each one.
+- Multiple datacenters
+- Separated by thousands of miles each (eg, ORD - HKG - AMS),
+- With many events happening concurrently at each one.
+
 - *We*want*to*count*them.*
 
-* Some Constraints:
+* With some constraints:
 
-- Counting should be *fast* (we can't afford to cross the ocean every time)
+- Counting should be *fast*, we can't afford to cross the ocean every time
 - Counts should be *correct* (please don't lose my events)
-- Counts shouldn't 
+
+Starting to look like an AP system, right?
 
 
-* Go design
+* Let's get started
 
-[[http://www.amazon.com/gp/product/1469769166/ref=as_li_ss_tl?ie=UTF8&camp=1789&creative=390957&creativeASIN=1469769166&linkCode=as2&tag=satishtalimsw-20][Google researchers]] designed the Go programming language that helped them solve the problems they had:
+First, a basic counter service
 
-- software needs to be built quickly,
-- the language should *run*well*on*modern*multi-core*hardware*,
-- work well in a networked environment, 
-- be a pleasure to use.
+- One node
+- Counter = Atomic Int
+- Nothin Fancy
 
-* With Go...
+ $ curl http://localhost:4000/
 
-you code less, compile quicker, execute_faster => have more fun! 
+ 0
+
+ $ curl http://localhost:4000/inc?amount=1
+ 
+ 1 
+
+
+* A basic Counter Service
+
 
 .play simple_counter/main.go /START OMIT/,/END OMIT/
 
-* Python and Ruby programmers...
 
-come to Go because they don't have to surrender much expressiveness, but gain performance and get to play with [[http://commandcenter.blogspot.de/2012/06/less-is-exponentially-more.html][concurrency]] (which is baked right into the language with channels and goroutines).
+* Ok, let's geodistribute it.
 
-* Go is a language...
-- that has the feel of a dynamic language like Ruby or Python, but has the [[http://www.amazon.com/gp/product/1469769166/ref=as_li_ss_tl?ie=UTF8&camp=1789&creative=390957&creativeASIN=1469769166&linkCode=as2&tag=satishtalimsw-20][performance and safety]] of languages like C or Java.
-- It is a completely open-source language, distributed with a BSD license, so it can be used by everybody even for commercial purposes without a fee, and it can even be changed by others.
+* Ok, let's geodistribute it.
 
-* Uses of the language
+- A node (or several) in each datacenter
+- Increment requests routed to the closest node
 
-Go:
+Let's stand one up in each.
 
-- can be used for systems programming
-- is a good fit for game server development
-- can be used for Complex event processing
-- is also a general programming language, useful for solving text-processing problems, making web apps, or even scripting-like applications
+* Demo (3 nodes, each with diverging counters)
 
-However, Go is _not_suited_ for real-time software because of its garbage collection and automatic memory allocation.
+*This*slide*is*incomplete*
 
-* Go Features
+* Duh, we're not replicating state!
 
-* Language Simplicity 
+- We need the counters to talk to each other
+- Which means we need the nodes to know about each other
+- Which means we need to to solve for cluster membership
 
-Go is free of cruft (superfluous) and is very well designed.
+Enter, the [[https://github.com/hashicorp/memberlist][memberlist]] package
 
-Most programming languages have been around for a long time, accumulating design cruft and weird behaviors that don't make sense anymore.
+* Memberlist
 
-* Go comes with well designed APIs for many of today's requirements:
-- HTTP server and client
-- JSON
-- Unicode
-- Cryptography
-- HTML and plain text template engine
+- A Go library that manages cluster membership
+- Based on [[https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf][SWIM]], a gossip-style membership protocol
+- Has baked in member failure detection
+- Used by Consul, Docker, libnetwork, many more 
 
-If you are making a web application that does not need a database, the standard library has you covered.
+* About SWIM
 
-* Formatting and coding style 
+"Scalable Weakly-consistent Infection-style Process Group Membership Protocol"
 
-In Go, this is a non-topic. The only acceptable formatting is the one generated by the command:
+Two goals: 
 
-- `go`fmt`
+- Maintain a local membership list of non-faulty processes
+- Detect and eventually notify others of process failures
 
-The compiler knows no warnings, there are either errors or no messages.
+* SWIM mechanics
 
-.play simple_counter/main.go /START OMIT/,/END OMIT/
+- Gossip-based
+- On join, a new node does a full state sync with an existing member, and begins gossipping its existence to the cluster
+- Gossip about memberlist state happens on a regular interval and against number of randomly selected members
+- If a node doesn't ack a probe message, it is marked "suspicious"
+- If a suspicious node doesn't dispute suspicion after a timeout, it's marked dead
+- Every so often, a full state sync is done between random members (expensive!)
+- Tradeoffs between bandwidth and convergence time are configurable
 
-* Distributing binaries
+More details about SWIM can be found [[https://www.cs.cornell.edu/~asdas/research/dsn02-swim.pdf][here]] and [[http://prakhar.me/articles/swim/][here]].
 
-If you are a beginning Go programmer, you can just mail your executable to your friends or your parents, as long as they run the same architecture and operating system.
+* Becoming Cluster-aware via Memberlist
 
-* Documentation
-- [[http://tour.golang.org/#1][Interactive introduction into the language]]
-- Regular posts on the [[http://blog.golang.org/index][Go blog]] explaining specific areas, like string handling, arrays and slices and code formatting amongst others
-- [[http://golang.org/ref/spec][Language specification]] that doubles as a language reference
-- API documentation and examples for the [[http://golang.org/pkg/][standard library]]
+	members  = flag.String("members", "", "comma seperated list of members")
 
-* Why learn Go?
+	...
 
-For me to invest the time to learn a new language, it must affirm at least one of these two questions:
-- Is this a language I could realistically use in a production environment?
-- Will this language grow my ability to solve complex problems in different ways?
+	c := memberlist.DefaultWANConfig()
+	
+	m, err := memberlist.Create(c)
+	
+	if err != nil {
+		return err
+	}
+	
+	//Join other members if specified, otherwise start a new cluster
+	if len(*members) > 0 {
+		members_each := strings.Split(*members, ",")
+		_, err := m.Join(members_each)
+		if err != nil {
+			return err
+		}
+	}
 
-The answer to both of these questions is *yes*.
+	
 
-* Organizations using Go
 
-Since May 2010, Go is used in production at *Google* for the back-end infrastructure, e.g. writing programs for administering complex environments. Google wants to invest in it and the language is production-worthy.
+* Demo 
 
-Go is being used in many organizations beyond Google like [[http://www.quora.com/Go-programming-language/Is-Google-Go-ready-for-production-use/answer/Kunal-Anand][BBC Worldwide]], [[https://plus.google.com/114945221884326152379/posts/d1SVaqkRyTL][Novartis]], [[https://plus.google.com/114945221884326152379/posts/d1SVaqkRyTL][bitly]], [[http://torbit.com/blog/2013/02/19/big-data-at-torbit/][Torbit]], [[https://blog.cyphertite.com/go-at-conformal/][Conformal]] and [[http://blog.golang.org/go-at-heroku][Heroku]] to name a few. 
+#Demonstrate /cluster
+#Kill a node, refresh /cluster
+#still not merging!
 
-* Success Stories with Go
 
-The [[https://code.google.com/p/go-wiki/wiki/SuccessStories][Go success stories]] from around the web makes an interesting read too.
+* CRDTs to the rescue!
 
-* Go International Conferences
+* CRDTs, simplified
 
-[[http://www.gophercon.com/][The First Ever Go Conference]] is being held in Denver CO, USA this April and their sponsors list has some interesting company names like Ubuntu, Paypal, Apcera, Stripe, Poptip, Canonical, Iron.io amongst others.
+#semilattice algebra lets them merbe without conflict
 
-.image ./gophercon.jpg
 
-I will be representing my company JoshSoftware at the conference.
+- CRDT = Conflict-Free Replicated Data Types
+- Counters, Sets, Maps, et al
+- Operations within the type must be associative, commutative, and idempotent 
+- Order-free
+- Therefore, very easy to handle failure scenarios: just retry the merge!
 
-The [[http://www.dotgo.eu/][First Ever European Go Conference]] is being held in Paris, France this October.
+#network down? merge again! messages out of order? merge again! state out of sync? merge again!
 
-* Will Android switch from Java to Go?
+CRDTs are by nature eventually consistent, because there is no single source of truth.
 
-Apple owns Objective-C. Microsoft owns C#. Google obviously _does_not_own_ Java. 
+Some notes can be found [[http://hal.upmc.fr/inria-00555588/document][here]] and [[https://github.com/pfraze/crdt_notes][here]] (among many others!). 
 
-[[http://www.androidauthority.com/android-switch-java-go-86040/][If Google makes the switch from Java to Go for Android]]:
+* G-Counter
 
-- Then Android developers will have to learn Go. 
-- In the long run it definitely sounds like something that would be ideal for Google since they'd have full control over what happens with the language. 
-- Since Go's such a friendly language they might even get developers to be interested in learning it, just like the vast majority of iOS developers had to learn Objective-C to make iOS apps.
+Perhaps one of the most basic CRDTs:
 
-* Go and Cloud Computing
+- A counter with only two ops: increment and merge (no decrement!)
+- Each node manages its own count
+- Nodes communicate their counter state with other nodes
+- Merges take the max() count for each node
 
-Java is an amazing language but *it*predates*the*cloud*. It is much easier to build and deploy high performance applications in virtual environments in Go.
+G-Counter's Value is the sum of all node count values
 
-[[http://www.businessinsider.in/Google-Has-Created-A-Programming-Language-That-Thumbs-Its-Nose-At-Oracle/articleshow/22233196.cms][If Go could replace Java for cloud computing]], what would that do to Oracle? 
 
-- It would remove a lot of connection to Oracle from companies in the cloud space.
-- It would ignite a whole new set of innovation based around Go libraries, frameworks, platforms and services. 
-- The lock-in that Java has within the enterprise would also dissipate as companies move core areas of development to Go.
+#why go through all the trouble? when i can just query locally?
+#what if the node goes down permanently? waht if you lose the state?
 
-* The coming decade
+* 
 
-It's been a pure joy to work with Go and I'm sure it will only continue to improve and grow as a language and community.
+	type GCounter struct {
+		// ident provides a unique identity to each replica.
+		ident string
 
-The next decade surely belongs to Go. 
+		// counter maps identity of each replica to their counter values
+		counter map[string]int
+	}
 
-.image ./small.png
+	func (g *GCounter) IncVal(incr int) {
+		g.counter[g.ident] += incr
+	}
 
-*Are*YOU*prepared?*
+	func (g *GCounter) Count() (total int) {
+		for _, val := range g.counter {
+			total += val
+		}
+		return 
+	}
+
+	func (g *GCounter) Merge(c *GCounter) {
+		for ident, val := range c.counter {
+			if v, ok := g.counter[ident]; !ok || v < val {
+				g.counter[ident] = val
+			}
+		}
+	}
+
+* Demo 
+
+#Demonstrate /verbose
+#still not merging!
+
+
+
+
+* Let's Merge State!
+
+* Merging State via Memberlist
+
+   [DEBUG] memberlist: Initiating push/pull sync with: 127.0.0.1:61300
+
+- Memberlist does a "push/pull" to do a complete state exchange with another random member
+- We can piggyback this state exchange via the `Delegate` interface: `LocalState()` and `MergeRemoteState()` 
+- Push/pull interval is configurable
+- Happens over TCP
+
+Let's use it to eventually merge state in the background.
+
+
+* Merging State via Memberlist
+
+	// Share the local counter state via MemberList to another node
+	func (d *delegate) LocalState(join bool) []byte {
+
+		b, err := counter.MarshalJSON()
+
+		if err != nil {
+			panic(err)
+		}
+
+		return b
+	}
+
+	// Merge a received counter state
+	func (d *delegate) MergeRemoteState(buf []byte, join bool) {
+		if len(buf) == 0 {
+			return
+		}
+
+		externalCRDT := crdt.NewGCounterFromJSON(buf)
+		counter.Merge(externalCRDT)
+	}
+
+* Demo
+
+* Success! (Eventually)
+
+* Want so sync faster? 
+
+It's possible to broadcast to all member nodes, via `NotifyMsg()` and `QueueBroadcast()`. 
+
+	func BroadcastState() {
+		...
+		broadcasts.QueueBroadcast(&broadcast{
+			msg:    b,
+		})
+	}
+
+	// NotifyMsg is invoked upon receipt of message
+	func (d *delegate) NotifyMsg(b []byte) {
+		...
+		switch update.Action {
+		case "merge":
+			externalCRDT := crdt.NewGCounterFromJSONBytes(update.Data)
+			counter.Merge(externalCRDT)
+		}
+		...
+	}
+
+Faster sync for more bandwidth. Still eventually consistent.
+
+* Demo
+
+* Next:
+
+- Implement persistence and time windowing
+- No tests? For shame!
+- We probably want more than one node per datacenter
+- Jepsen all the things
+- Implement a real RPC layer instead of Memberlist' `delegate` for finer performance and authn/z control
+- Run it as a unikernel within docker running inside a VM in the cloud
+- Sprinkle some devops magic dust on it
+- Achieve peak microservice
+
+
+
+* Fin!
+
+- Questions?
+- Slides and code can be found at [[github.com/nphase/go-clustering-example][github.com/nphase/go-clustering-example]]
+- MediaMath is hiring!
+- Thanks!
+
