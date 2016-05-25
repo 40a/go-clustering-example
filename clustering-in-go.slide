@@ -148,11 +148,6 @@ More details about SWIM can be found [[https://www.cs.cornell.edu/~asdas/researc
 
 * Demo 
 
-#Demonstrate /cluster
-#Kill a node, refresh /cluster
-#still not merging!
-
-
 * CRDTs to the rescue!
 
 * CRDTs, simplified
@@ -166,7 +161,6 @@ More details about SWIM can be found [[https://www.cs.cornell.edu/~asdas/researc
 - Order-free
 - Therefore, very easy to handle failure scenarios: just retry the merge!
 
-#network down? merge again! messages out of order? merge again! state out of sync? merge again!
 
 CRDTs are by nature eventually consistent, because there is no single source of truth.
 
@@ -232,12 +226,6 @@ G-Counter's Value is the sum of all node count values
 	}
 
 * Demo 
-
-#Demonstrate /verbose
-#still not merging!
-
-
-
 
 * Let's Merge State!
 
