@@ -31,7 +31,7 @@ MediaMath
 - More often not, services roll it themselves
 
 - So, here's one way of building a clustered, stateful service in Go.
-*This*slide*is*incomplete*
+
 
 
 * And now, for a (fake-ish) scenario
@@ -78,13 +78,11 @@ First, a basic counter service
 * Ok, let's geodistribute it.
 
 - A node (or several) in each datacenter
-- Increment requests routed to the closest node
+- Route increment requests to the closest node
 
 Let's stand one up in each.
 
-* Demo (3 nodes, each with diverging counters)
-
-*This*slide*is*incomplete*
+* Demo
 
 * Duh, we're not replicating state!
 
@@ -163,7 +161,7 @@ More details about SWIM can be found [[https://www.cs.cornell.edu/~asdas/researc
 
 
 - CRDT = Conflict-Free Replicated Data Types
-- Counters, Sets, Maps, et al
+- Counters, Sets, Maps, Flags, et al
 - Operations within the type must be associative, commutative, and idempotent 
 - Order-free
 - Therefore, very easy to handle failure scenarios: just retry the merge!
@@ -188,6 +186,21 @@ G-Counter's Value is the sum of all node count values
 
 #why go through all the trouble? when i can just query locally?
 #what if the node goes down permanently? waht if you lose the state?
+
+
+
+* G-counter
+
+.image g-counter-1.png 700 900
+
+* G-counter
+
+.image g-counter-2.png 700 900
+
+* G-counter
+
+.image g-counter-3.png 700 900
+
 
 * 
 
@@ -270,7 +283,7 @@ Let's use it to eventually merge state in the background.
 
 * Want so sync faster? 
 
-It's possible to broadcast to all member nodes, via `NotifyMsg()` and `QueueBroadcast()`. 
+It's possible to broadcast to all member nodes, via Memberlist's `QueueBroadcast()` and `NotifyMsg()`. 
 
 	func BroadcastState() {
 		...
@@ -296,16 +309,18 @@ Faster sync for more bandwidth. Still eventually consistent.
 
 * Next:
 
-- Implement persistence and time windowing
 - No tests? For shame!
+- Implement persistence and time windowing
 - We probably want more than one node per datacenter
 - Jepsen all the things
-- Implement a real RPC layer instead of Memberlist' `delegate` for finer performance and authn/z control
+- Implement a real RPC layer instead of Memberlist's `delegate` for finer performance and authn/z control
 - Run it as a unikernel within docker running inside a VM in the cloud
 - Sprinkle some devops magic dust on it
 - Achieve peak microservice
 
+* TL;DR:
 
+It's not (that) hard to build a clustered service in go.
 
 * Fin!
 

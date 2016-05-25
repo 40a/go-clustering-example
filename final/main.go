@@ -71,6 +71,8 @@ func (d *delegate) NotifyMsg(b []byte) {
 
 	switch update.Action {
 	case "merge":
+		fmt.Println(" === Received Broadcast of Remote State === ")
+
 		externalCRDT := crdt.NewGCounterFromJSONBytes([]byte(update.Data))
 		counter.Merge(externalCRDT)
 	default:
@@ -85,6 +87,8 @@ func (d *delegate) GetBroadcasts(overhead, limit int) [][]byte {
 
 // Share the local counter state via MemberList to another node
 func (d *delegate) LocalState(join bool) []byte {
+
+	fmt.Println(" === Sharing Remote State for push/pull sync === ")
 
 	b, err := counter.MarshalJSON()
 
@@ -103,12 +107,16 @@ func (d *delegate) MergeRemoteState(buf []byte, join bool) {
 		return
 	}
 
+	fmt.Println(" === Merging Remote State for push/pull sync === ")
+
 	externalCRDT := crdt.NewGCounterFromJSONBytes(buf)
 	counter.Merge(externalCRDT)
 }
 
 // BroadcastState broadcasts the local counter state to all cluster members
 func BroadcastState() {
+
+	fmt.Println(" === Broadcasting Local State === ")
 
 	counterJSON, marshalErr := counter.MarshalJSON()
 
