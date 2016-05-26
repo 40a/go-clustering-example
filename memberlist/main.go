@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,10 @@ func (c *Counter) Count() int {
 	return int(atomic.LoadInt32(&c.val))
 }
 
+func (c *Counter) String() string {
+	return strconv.Itoa(counter.Count())
+}
+
 func start() error {
 	flag.Parse()
 
@@ -49,7 +54,7 @@ func start() error {
 	c.BindPort = *rpc_port
 	c.Name = hostname + "-" + uuid.NewV4().String()
 
-	c.PushPullInterval = time.Second * 3 // to make sync demonstrable
+	c.PushPullInterval = time.Second * 5 // to make sync demonstrable
 	c.ProbeInterval = time.Second * 1    // to make failure demonstrable
 
 	var err error

@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 )
 
-// HTTP Handler for increment requets. Takes the form of /inc?amount=1
+// HTTP Handler for increment requests. Takes the form of /inc?amount=1
 func incHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	amountForm := r.Form.Get("amount")
@@ -26,8 +27,7 @@ func incHandler(w http.ResponseWriter, r *http.Request) {
 
 	counter.IncVal(amount)
 
-	val := strconv.Itoa(counter.Count())
-	w.Write([]byte(val))
+	fmt.Fprintln(w, counter)
 
 	// broadcast the state?
 	// go BroadcastState()
@@ -38,7 +38,7 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 
 	val := strconv.Itoa(counter.Count())
 
-	w.Write([]byte(val))
+	fmt.Fprintln(w, counter)
 }
 
 // HTTP Handler to fetch the full local CRDT's counter state

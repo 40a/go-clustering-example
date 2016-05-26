@@ -151,8 +151,8 @@ func start() error {
 	c.BindPort = *rpc_port
 	c.Name = hostname + "-" + uuid.NewV4().String()
 
-	c.PushPullInterval = time.Second * 5 // to make it demonstrable
-	c.ProbeInterval = time.Second * 1    // to make failure demonstrable
+	c.PushPullInterval = time.Second * 10 // to make it demonstrable
+	c.ProbeInterval = time.Second * 1     // to make failure demonstrable
 
 	var err error
 

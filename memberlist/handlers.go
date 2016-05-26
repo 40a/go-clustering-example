@@ -7,13 +7,12 @@ import (
 	"strconv"
 )
 
-// incHandler is a HTTP Handler for increment requets. Takes the form of /inc?amount=1
+// incHandler is a HTTP Handler for increment requests. Takes the form of /inc?amount=1
 func incHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	amountForm := r.Form.Get("amount")
 
 	//parse inc amount
-	amount, parseErr := strconv.Atoi(amountForm)
+	amount, parseErr := strconv.Atoi(r.FormValue("amount"))
 
 	if parseErr != nil {
 		http.Error(w, parseErr.Error(), 500)
@@ -27,18 +26,15 @@ func incHandler(w http.ResponseWriter, r *http.Request) {
 
 	counter.IncVal(amount)
 
-	val := strconv.Itoa(counter.Count())
-
-	fmt.Printf("Incremented counter to %v\n", val)
-	w.Write([]byte(val))
+	fmt.Printf("Incremented counter to %v\n", counter)
+	fmt.Fprintln(w, counter)
 
 }
 
 // getHandler is a HTTP Handler to fetch the counter's count. Just /
 func getHandler(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
 	val := strconv.Itoa(counter.Count())
-	w.Write([]byte(val))
+	fmt.Fprintln(w, counter)
 }
 
 // HTTP Handler to fetch the cluster membership state
